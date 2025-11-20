@@ -81,7 +81,6 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME}]"
     --region $REGION \
     --query "Instances[0].InstanceId" --output text)
-
 echo "EC2 Instance created: $INSTANCE_ID"
 echo "Waiting for Public IP..."
 

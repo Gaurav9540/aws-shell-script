@@ -45,17 +45,22 @@ fi
 echo ""
 echo "========== Deleting Security Group =========="
 
+# ▶ Correct SG lookup (avoids malformed ID)
 SG_ID=$(aws ec2 describe-security-groups \
-    --group-names "$SECURITY_GROUP_NAME" \
     --region $REGION \
-    --query "SecurityGroups[0].GroupId" 2>/dev/null || true)
+    --filters "Name=group-name,Values=$SECURITY_GROUP_NAME" \
+    --query "SecurityGroups[0].GroupId" \
+    --output text 2>/dev/null)
+
+# Remove unwanted quotes if any
+SG_ID=$(echo "$SG_ID" | tr -d '"')
 
 if [[ -z "$SG_ID" || "$SG_ID" == "None" ]]; then
     echo "Security Group '$SECURITY_GROUP_NAME' not found."
 else
     echo "Deleting SG: $SG_ID"
     aws ec2 delete-security-group \
-        --group-id "$SG_ID" \
+        --group-id $SG_ID \
         --region $REGION
     echo "Security Group deleted ✓"
 fi

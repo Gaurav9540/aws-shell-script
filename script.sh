@@ -4,6 +4,7 @@ set -e
 # ===================================================
 #  VARIABLES
 # ===================================================
+INSTANCE_NAME="devops-ec2-instance"
 REGION="us-east-1"
 INSTANCE_TYPE="t3.small"
 AMI_ID="ami-0ecb62995f68bb549"  # Ubuntu 22.04
@@ -77,6 +78,7 @@ INSTANCE_ID=$(aws ec2 run-instances \
     --instance-type "$INSTANCE_TYPE" \
     --key-name "$KEY_NAME" \
     --security-group-ids "$SG_ID" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME}]"
     --region $REGION \
     --query "Instances[0].InstanceId" --output text)
 

@@ -12,31 +12,33 @@ BUCKET_NAME_PREFIX="my-devops-bucket"
 # ===================================================
 
 
-echo "========== Finding EC2 Instance =========="
+echo "========== Finding EC2 Instances =========="
 
-# Get instance ID by tag Name
-INSTANCE_ID=$(aws ec2 describe-instances \
+INSTANCE_IDS=$(aws ec2 describe-instances \
     --region $REGION \
     --filters "Name=tag:Name,Values=$INSTANCE_NAME" \
     --query "Reservations[*].Instances[*].InstanceId" \
     --output text)
 
-if [[ -z "$INSTANCE_ID" ]]; then
-    echo "No EC2 instance found with name: $INSTANCE_NAME"
+if [[ -z "$INSTANCE_IDS" ]]; then
+    echo "No EC2 instances found with name: $INSTANCE_NAME"
 else
-    echo "Found Instance: $INSTANCE_ID"
-    echo "Terminating instance..."
+    echo "Found Instances:"
+    echo "$INSTANCE_IDS"
+    echo "Terminating instances..."
 
-    aws ec2 terminate-instances \
-        --instance-ids "$INSTANCE_ID" \
-        --region $REGION >/dev/null
+    for INSTANCE_ID in $INSTANCE_IDS; do
+        echo "Terminating $INSTANCE_ID ..."
+        aws ec2 terminate-instances \
+            --instance-ids "$INSTANCE_ID" \
+            --region $REGION >/dev/null
 
-    echo "Waiting for instance to terminate..."
-    aws ec2 wait instance-terminated \
-        --instance-ids "$INSTANCE_ID" \
-        --region $REGION
-
-    echo "Instance terminated ✓"
+        echo "Waiting for $INSTANCE_ID to terminate..."
+        aws ec2 wait instance-terminated \
+            --instance-ids "$INSTANCE_ID" \
+            --region $REGION
+        echo "$INSTANCE_ID terminated ✓"
+    done
 fi
 
 
@@ -46,7 +48,7 @@ echo "========== Deleting Security Group =========="
 SG_ID=$(aws ec2 describe-security-groups \
     --group-names "$SECURITY_GROUP_NAME" \
     --region $REGION \
-    --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)
+    --query "SecurityGroups[0].GroupId" 2>/dev/null || true)
 
 if [[ -z "$SG_ID" || "$SG_ID" == "None" ]]; then
     echo "Security Group '$SECURITY_GROUP_NAME' not found."
@@ -55,7 +57,6 @@ else
     aws ec2 delete-security-group \
         --group-id "$SG_ID" \
         --region $REGION
-
     echo "Security Group deleted ✓"
 fi
 
@@ -80,34 +81,38 @@ fi
 
 
 echo ""
-echo "========== Deleting S3 Bucket =========="
+echo "========== Deleting S3 Buckets =========="
 
-BUCKET_NAME=$(aws s3api list-buckets \
+BUCKETS=$(aws s3api list-buckets \
     --query "Buckets[?starts_with(Name, '$BUCKET_NAME_PREFIX')].Name" \
     --output text)
 
-if [[ -z "$BUCKET_NAME" ]]; then
-    echo "No S3 bucket found with prefix: $BUCKET_NAME_PREFIX"
+if [[ -z "$BUCKETS" ]]; then
+    echo "No S3 buckets found with prefix: $BUCKET_NAME_PREFIX"
 else
-    echo "Found bucket: $BUCKET_NAME"
+    echo "Found Buckets:"
+    echo "$BUCKETS"
 
-    echo "Emptying bucket..."
-    aws s3 rm "s3://$BUCKET_NAME" --recursive --region $REGION >/dev/null
+    for BUCKET in $BUCKETS; do
+        echo "Emptying bucket: $BUCKET"
+        aws s3 rm "s3://$BUCKET" --recursive --region $REGION >/dev/null
+      
+        echo "Deleting bucket: $BUCKET"
+        aws s3api delete-bucket \
+            --bucket "$BUCKET" \
+            --region $REGION
 
-    echo "Deleting bucket..."
-    aws s3api delete-bucket \
-        --bucket "$BUCKET_NAME" \
-        --region $REGION
-    echo "S3 Bucket deleted ✓"
+        echo "Bucket $BUCKET deleted ✓"
+    done
 fi
 
 
 echo ""
 echo "========== SUMMARY =========="
-echo "EC2 Instance   : Deleted (if existed)"
+echo "EC2 Instances  : Deleted (if existed)"
 echo "Security Group : Deleted (if existed)"
 echo "Key Pair       : Deleted"
-echo "S3 Bucket      : Deleted"
+echo "S3 Buckets     : Deleted"
 echo "Local PEM File : Deleted"
 echo "========================================="
 echo "Cleanup completed successfully 🧹"
